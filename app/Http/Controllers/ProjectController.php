@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateProjectRequest;
 use App\Http\Resources\ProjectResource;
 use App\Http\Resources\TaskResource;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class ProjectController extends Controller
@@ -55,6 +56,11 @@ class ProjectController extends Controller
         $data = $request->validated();
         $data['created_by'] = Auth::id();
         $data['updated_by'] = Auth::id();
+
+        if ($request->hasFile('image')) {
+            $data['image_path'] = $request->file('image')->store('project_images', 'public');
+        }
+
         Project::create($data);
 
         return to_route('project.index')->with('success', 'Project Created');
@@ -90,7 +96,9 @@ class ProjectController extends Controller
      */
     public function edit(Project $project)
     {
-        //
+        return inertia('Project/Edit', [
+            'project' => new ProjectResource($project)
+        ]);
     }
 
     /**
@@ -98,7 +106,21 @@ class ProjectController extends Controller
      */
     public function update(UpdateProjectRequest $request, Project $project)
     {
-        //
+        $data = $request->validated();
+
+        $data['created_by'] = Auth::id();
+        $data['updated_by'] = Auth::id();
+
+        if ($request->hasFile('image')) {
+            if ($project->image_path) {
+                Storage::disk('public')->delete($project->image_path);
+            }
+            $data['image_path'] = $request->file('image')->store('project_images', 'public');
+        }
+
+        $project->update($data);
+
+        return to_route('project.index')->with('success', "Project '{$project->name}' successfully Edited");
     }
 
     /**
@@ -106,6 +128,13 @@ class ProjectController extends Controller
      */
     public function destroy(Project $project)
     {
-        //
+        $name = $project->name;
+
+        if ($project->image_path) {
+            Storage::disk('public')->delete($project->image_path);
+        }
+
+        $project->delete();
+        return to_route('project.index')->with('success', "Project '{$name}' Successfully Deleted");
     }
 }
